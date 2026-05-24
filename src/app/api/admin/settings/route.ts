@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { requireAdminApi } from "@/lib/admin-api";
+import { requireAdminApi, adminSaveErrorResponse } from "@/lib/admin-api";
 import { getSiteSettings, saveSiteSettings } from "@/lib/data/settings";
 import type { SiteSettings } from "@/types/content";
 
@@ -21,7 +21,7 @@ export async function PUT(request: Request) {
     await saveSiteSettings(body);
     revalidatePath("/", "layout");
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to save settings" }, { status: 400 });
+  } catch (error) {
+    return adminSaveErrorResponse(error, "Failed to save settings");
   }
 }

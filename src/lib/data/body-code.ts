@@ -1,8 +1,9 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "fs/promises";
 import type { BodyCodeSettings } from "@/types/content";
 import { BODY_CODE_FILE } from "@/lib/data/paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 
 const defaultBodyCode: BodyCodeSettings = {
   code: "",
@@ -10,12 +11,10 @@ const defaultBodyCode: BodyCodeSettings = {
 };
 
 export async function getBodyCode(): Promise<BodyCodeSettings> {
-  try {
-    const raw = await readFile(BODY_CODE_FILE, "utf8");
-    return JSON.parse(raw) as BodyCodeSettings;
-  } catch {
-    return defaultBodyCode;
-  }
+  return readJson(STORAGE_KEYS.bodyCode, {
+    filePath: BODY_CODE_FILE,
+    fallback: defaultBodyCode,
+  });
 }
 
 export async function saveBodyCode(code: string): Promise<BodyCodeSettings> {
@@ -24,10 +23,9 @@ export async function saveBodyCode(code: string): Promise<BodyCodeSettings> {
     updatedAt: new Date().toISOString(),
   };
 
-  await mkdir(BODY_CODE_FILE.replace(/[/\\][^/\\]+$/, ""), {
-    recursive: true,
+  await writeJson(STORAGE_KEYS.bodyCode, settings, {
+    filePath: BODY_CODE_FILE,
   });
-  await writeFile(BODY_CODE_FILE, JSON.stringify(settings, null, 2), "utf8");
 
   return settings;
 }

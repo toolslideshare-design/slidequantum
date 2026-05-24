@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { requireAdminApi } from "@/lib/admin-api";
+import { requireAdminApi, adminSaveErrorResponse } from "@/lib/admin-api";
 import {
   deleteBlogPost,
   getAllBlogPosts,
@@ -48,8 +48,8 @@ export async function POST(request: Request) {
     revalidatePath(`/blog/${slug}`);
 
     return NextResponse.json(post, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Failed to create blog post" }, { status: 400 });
+  } catch (error) {
+    return adminSaveErrorResponse(error, "Failed to create blog post");
   }
 }
 

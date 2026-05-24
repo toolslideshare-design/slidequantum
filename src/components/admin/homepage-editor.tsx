@@ -3,14 +3,19 @@
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import type { HomepageContentData } from "@/types/content";
+import { submitAdminJsonRequest } from "@/lib/admin-client";
 import { AdminCard } from "@/components/admin/admin-card";
 import { AdminField, adminInputClassName } from "@/components/admin/admin-field";
+import {
+  AdminMessage,
+  getAdminMessageVariant,
+} from "@/components/admin/admin-message";
 import { Button } from "@/components/ui/button";
-
 export function HomepageEditor() {
   const [content, setContent] = useState<HomepageContentData | null>(null);
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const [isStorageError, setIsStorageError] = useState(false);  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -27,16 +32,26 @@ export function HomepageEditor() {
     setSaving(true);
     setMessage("");
 
-    const response = await fetch("/api/admin/homepage", {
+    const result = await submitAdminJsonRequest<{ success?: boolean }>({
+      url: "/api/admin/homepage",
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(content),
+      body: content,
+      fallbackError: "Failed to save homepage content.",
     });
 
     setSaving(false);
-    setMessage(response.ok ? "Homepage content saved successfully." : "Failed to save content.");
-  }
 
+    if (!result.ok) {
+      setIsError(true);
+      setIsStorageError(result.isStorageError);
+      setMessage(result.error);
+      return;
+    }
+
+    setIsError(false);
+    setIsStorageError(false);
+    setMessage("Homepage content saved successfully.");
+  }
   if (loading || !content) {
     return <p className="text-muted-foreground">Loading homepage content...</p>;
   }
@@ -59,12 +74,10 @@ export function HomepageEditor() {
         </Button>
       </div>
 
-      {message && (
-        <p className="rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-200">
-          {message}
-        </p>
-      )}
-
+      <AdminMessage
+        message={message}
+        variant={getAdminMessageVariant({ isError, isStorageError })}
+      />
       <AdminCard title="Hero Section">
         <div className="grid gap-4">
           <AdminField label="Badge">

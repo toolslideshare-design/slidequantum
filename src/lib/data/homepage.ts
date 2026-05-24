@@ -1,15 +1,25 @@
 import "server-only";
 
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile } from "fs/promises";
 import type { HomepageContentData } from "@/types/content";
 import { HOMEPAGE_FILE } from "./paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 
-export async function getHomepageContent(): Promise<HomepageContentData> {
+async function getBundledHomepageContent(): Promise<HomepageContentData> {
   const raw = await readFile(HOMEPAGE_FILE, "utf8");
   return JSON.parse(raw) as HomepageContentData;
 }
 
+export async function getHomepageContent(): Promise<HomepageContentData> {
+  return readJson(STORAGE_KEYS.homepageContent, {
+    filePath: HOMEPAGE_FILE,
+    fallback: await getBundledHomepageContent(),
+  });
+}
+
 export async function saveHomepageContent(data: HomepageContentData): Promise<void> {
-  await mkdir(HOMEPAGE_FILE.replace(/[/\\][^/\\]+$/, ""), { recursive: true });
-  await writeFile(HOMEPAGE_FILE, JSON.stringify(data, null, 2), "utf8");
+  await writeJson(STORAGE_KEYS.homepageContent, data, {
+    filePath: HOMEPAGE_FILE,
+  });
 }

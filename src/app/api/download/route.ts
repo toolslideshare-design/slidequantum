@@ -24,8 +24,21 @@ type SlideImage = {
   bytes: Uint8Array;
 };
 
-const DOWNLOAD_DIR = path.join(process.cwd(), "public", "downloads");
-const DOWNLOAD_URL_PREFIX = "/downloads";
+const LOCAL_DOWNLOAD_DIR = path.join(process.cwd(), "public", "downloads");
+const VERCEL_DOWNLOAD_DIR = path.join("/tmp", "slidequantum-downloads");
+const LOCAL_DOWNLOAD_URL_PREFIX = "/downloads";
+const VERCEL_DOWNLOAD_URL_PREFIX = "/api/downloads";
+
+function getDownloadPaths() {
+  const isVercel = process.env.VERCEL === "1";
+
+  return {
+    dir: isVercel ? VERCEL_DOWNLOAD_DIR : LOCAL_DOWNLOAD_DIR,
+    urlPrefix: isVercel
+      ? VERCEL_DOWNLOAD_URL_PREFIX
+      : LOCAL_DOWNLOAD_URL_PREFIX,
+  };
+}
 
 const requestHeaders = {
   "User-Agent":
@@ -143,13 +156,14 @@ async function createPpt(slides: SlideImage[]): Promise<Buffer> {
 }
 
 async function saveGeneratedFile(buffer: Buffer, extension: "pdf" | "pptx") {
-  await mkdir(DOWNLOAD_DIR, { recursive: true });
+  const { dir, urlPrefix } = getDownloadPaths();
+  await mkdir(dir, { recursive: true });
 
   const fileName = `slideshare-${Date.now()}-${randomUUID()}.${extension}`;
-  const filePath = path.join(DOWNLOAD_DIR, fileName);
+  const filePath = path.join(dir, fileName);
   await writeFile(filePath, buffer);
 
-  return `${DOWNLOAD_URL_PREFIX}/${fileName}`;
+  return `${urlPrefix}/${fileName}`;
 }
 
 export async function POST(request: Request) {

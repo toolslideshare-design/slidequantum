@@ -3,17 +3,27 @@
 import { ChangeEvent, useEffect, useState } from "react";
 import { ImageIcon, Save, Upload } from "lucide-react";
 import type { FaviconSettings, SiteSettings } from "@/types/content";
+import {
+  submitAdminFormRequest,
+  submitAdminJsonRequest,
+} from "@/lib/admin-client";
 import { AdminCard } from "@/components/admin/admin-card";
 import { AdminField, adminInputClassName } from "@/components/admin/admin-field";
+import {
+  AdminMessage,
+  getAdminMessageVariant,
+} from "@/components/admin/admin-message";
 import { Button } from "@/components/ui/button";
-
 export function SettingsEditor() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [favicon, setFavicon] = useState<FaviconSettings | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [faviconMessage, setFaviconMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [settingsIsError, setSettingsIsError] = useState(false);
+  const [settingsStorageError, setSettingsStorageError] = useState(false);
+  const [faviconIsError, setFaviconIsError] = useState(false);
+  const [faviconStorageError, setFaviconStorageError] = useState(false);  const [saving, setSaving] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
 
   useEffect(() => {
@@ -30,16 +40,26 @@ export function SettingsEditor() {
     setSaving(true);
     setMessage("");
 
-    const response = await fetch("/api/admin/settings", {
+    const result = await submitAdminJsonRequest<{ success?: boolean }>({
+      url: "/api/admin/settings",
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
+      body: settings,
+      fallbackError: "Failed to save settings.",
     });
 
     setSaving(false);
-    setMessage(response.ok ? "Site settings saved successfully." : "Failed to save settings.");
-  }
 
+    if (!result.ok) {
+      setSettingsIsError(true);
+      setSettingsStorageError(result.isStorageError);
+      setMessage(result.error);
+      return;
+    }
+
+    setSettingsIsError(false);
+    setSettingsStorageError(false);
+    setMessage("Site settings saved successfully.");
+  }
   async function handleFaviconUpload() {
     if (!faviconFile) {
       setFaviconMessage("Please choose a .png, .ico, or .svg favicon first.");
@@ -52,27 +72,34 @@ export function SettingsEditor() {
     const formData = new FormData();
     formData.append("favicon", faviconFile);
 
-    const response = await fetch("/api/admin/favicon", {
-      method: "POST",
-      body: formData,
+    const result = await submitAdminFormRequest<{ settings?: FaviconSettings }>({
+      url: "/api/admin/favicon",
+      formData,
+      fallbackError: "Failed to upload favicon.",
     });
-    const data = (await response.json()) as {
-      settings?: FaviconSettings;
-      error?: string;
-    };
 
     setUploadingFavicon(false);
 
-    if (!response.ok || !data.settings) {
-      setFaviconMessage(data.error ?? "Failed to upload favicon.");
+    if (!result.ok) {
+      setFaviconIsError(true);
+      setFaviconStorageError(result.isStorageError);
+      setFaviconMessage(result.error);
       return;
     }
 
-    setFavicon(data.settings);
+    if (!result.data.settings) {
+      setFaviconIsError(true);
+      setFaviconStorageError(false);
+      setFaviconMessage("Failed to upload favicon.");
+      return;
+    }
+
+    setFavicon(result.data.settings);
     setFaviconFile(null);
+    setFaviconIsError(false);
+    setFaviconStorageError(false);
     setFaviconMessage("Favicon uploaded successfully.");
   }
-
   function handleFaviconChange(event: ChangeEvent<HTMLInputElement>) {
     setFaviconFile(event.target.files?.[0] ?? null);
     setFaviconMessage("");
@@ -101,11 +128,14 @@ export function SettingsEditor() {
       </div>
 
       {message && (
-        <p className="rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-200">
-          {message}
-        </p>
+        <AdminMessage
+          message={message}
+          variant={getAdminMessageVariant({
+            isError: settingsIsError,
+            isStorageError: settingsStorageError,
+          })}
+        />
       )}
-
       <AdminCard title="SEO & Site Info">
         <div className="grid gap-4">
           <AdminField label="Site Name">
@@ -176,11 +206,14 @@ export function SettingsEditor() {
             )}
 
             {faviconMessage && (
-              <p className="rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-200">
-                {faviconMessage}
-              </p>
+              <AdminMessage
+                message={faviconMessage}
+                variant={getAdminMessageVariant({
+                  isError: faviconIsError,
+                  isStorageError: faviconStorageError,
+                })}
+              />
             )}
-
             <Button
               type="button"
               onClick={handleFaviconUpload}

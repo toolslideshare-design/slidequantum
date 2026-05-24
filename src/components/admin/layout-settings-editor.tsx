@@ -3,8 +3,13 @@
 import { useEffect, useState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
 import type { FooterLinkGroup, LayoutLink, LayoutSettings } from "@/types/content";
+import { submitAdminJsonRequest } from "@/lib/admin-client";
 import { AdminCard } from "@/components/admin/admin-card";
 import { AdminField, adminInputClassName } from "@/components/admin/admin-field";
+import {
+  AdminMessage,
+  getAdminMessageVariant,
+} from "@/components/admin/admin-message";
 import { Button } from "@/components/ui/button";
 
 const emptyLink: LayoutLink = { label: "", href: "" };
@@ -23,6 +28,8 @@ function updateLink(
 export function LayoutSettingsEditor() {
   const [settings, setSettings] = useState<LayoutSettings | null>(null);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [isStorageError, setIsStorageError] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -36,18 +43,25 @@ export function LayoutSettingsEditor() {
     setSaving(true);
     setMessage("");
 
-    const response = await fetch("/api/admin/layout-settings", {
+    const result = await submitAdminJsonRequest<{ success?: boolean }>({
+      url: "/api/admin/layout-settings",
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
+      body: settings,
+      fallbackError: "Failed to save layout settings.",
     });
 
     setSaving(false);
-    setMessage(
-      response.ok
-        ? "Layout settings saved successfully."
-        : "Failed to save layout settings."
-    );
+
+    if (!result.ok) {
+      setIsError(true);
+      setIsStorageError(result.isStorageError);
+      setMessage(result.error);
+      return;
+    }
+
+    setIsError(false);
+    setIsStorageError(false);
+    setMessage("Layout settings saved successfully.");
   }
 
   if (!settings) {
@@ -95,9 +109,10 @@ export function LayoutSettingsEditor() {
       </div>
 
       {message && (
-        <p className="rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-200">
-          {message}
-        </p>
+        <AdminMessage
+          message={message}
+          variant={getAdminMessageVariant({ isError, isStorageError })}
+        />
       )}
 
       <AdminCard title="Header">

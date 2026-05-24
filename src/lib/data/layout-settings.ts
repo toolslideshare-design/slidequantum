@@ -1,8 +1,9 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "fs/promises";
 import type { LayoutSettings } from "@/types/content";
 import { LAYOUT_SETTINGS_FILE } from "./paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 
 const defaultLayoutSettings: LayoutSettings = {
   header: {
@@ -58,23 +59,16 @@ const defaultLayoutSettings: LayoutSettings = {
 };
 
 export async function getLayoutSettings(): Promise<LayoutSettings> {
-  try {
-    const raw = await readFile(LAYOUT_SETTINGS_FILE, "utf8");
-    return JSON.parse(raw) as LayoutSettings;
-  } catch {
-    return defaultLayoutSettings;
-  }
+  return readJson(STORAGE_KEYS.layoutSettings, {
+    filePath: LAYOUT_SETTINGS_FILE,
+    fallback: defaultLayoutSettings,
+  });
 }
 
 export async function saveLayoutSettings(settings: LayoutSettings): Promise<void> {
-  await mkdir(LAYOUT_SETTINGS_FILE.replace(/[/\\][^/\\]+$/, ""), {
-    recursive: true,
+  await writeJson(STORAGE_KEYS.layoutSettings, settings, {
+    filePath: LAYOUT_SETTINGS_FILE,
   });
-  await writeFile(
-    LAYOUT_SETTINGS_FILE,
-    JSON.stringify(settings, null, 2),
-    "utf8"
-  );
 }
 
 export { defaultLayoutSettings };

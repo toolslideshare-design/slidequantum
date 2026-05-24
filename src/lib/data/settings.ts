@@ -1,8 +1,9 @@
 import "server-only";
 
-import { readFile, writeFile, mkdir } from "fs/promises";
 import type { SiteSettings } from "@/types/content";
 import { SITE_SETTINGS_FILE } from "./paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 
 const defaultSettings: SiteSettings = {
   name: "SlideQuantum",
@@ -27,19 +28,21 @@ const defaultSettings: SiteSettings = {
 };
 
 export async function getSiteSettings(): Promise<SiteSettings> {
-  try {
-    const raw = await readFile(SITE_SETTINGS_FILE, "utf8");
-    return JSON.parse(raw) as SiteSettings;
-  } catch {
-    return defaultSettings;
-  }
+  const settings = await readJson(STORAGE_KEYS.siteSettings, {
+    filePath: SITE_SETTINGS_FILE,
+    fallback: defaultSettings,
+  });
+
+  return {
+    ...settings,
+    url: process.env.NEXT_PUBLIC_SITE_URL ?? settings.url,
+  };
 }
 
 export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
-  await mkdir(SITE_SETTINGS_FILE.replace(/[/\\][^/\\]+$/, ""), {
-    recursive: true,
+  await writeJson(STORAGE_KEYS.siteSettings, settings, {
+    filePath: SITE_SETTINGS_FILE,
   });
-  await writeFile(SITE_SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf8");
 }
 
 export { defaultSettings };

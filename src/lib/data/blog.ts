@@ -1,18 +1,24 @@
 import "server-only";
 
-import { readFile, writeFile, readdir, unlink, mkdir } from "fs/promises";
+import { readFile, readdir } from "fs/promises";
 import path from "path";
 import type { BlogPost } from "@/types/content";
 import { BLOG_DIR } from "./paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import {
+  deleteJson,
+  isKvStorageEnabled,
+  readJson,
+  writeJson,
+} from "@/lib/storage/json-store";
 
 function blogFilePath(slug: string): string {
   return path.join(BLOG_DIR, `${slug}.json`);
 }
 
-export async function getAllBlogPosts(): Promise<BlogPost[]> {
-  await mkdir(BLOG_DIR, { recursive: true });
-
+async function readBlogPostsFromFilesystem(): Promise<BlogPost[]> {
   let files: string[] = [];
+
   try {
     files = await readdir(BLOG_DIR);
   } catch {
@@ -33,26 +39,67 @@ export async function getAllBlogPosts(): Promise<BlogPost[]> {
   );
 }
 
-export async function getBlogPost(slug: string): Promise<BlogPost | null> {
-  try {
-    const raw = await readFile(blogFilePath(slug), "utf8");
-    return JSON.parse(raw) as BlogPost;
-  } catch {
-    return null;
+async function getBlogIndex(): Promise<string[]> {
+  return readJson<string[]>(STORAGE_KEYS.blogIndex, { fallback: [] });
+}
+
+async function setBlogIndex(slugs: string[]): Promise<void> {
+  await writeJson(STORAGE_KEYS.blogIndex, slugs);
+}
+
+export async function getAllBlogPosts(): Promise<BlogPost[]> {
+  const fsPosts = await readBlogPostsFromFilesystem();
+  const indexedSlugs = isKvStorageEnabled() ? await getBlogIndex() : [];
+  const allSlugs = [
+    ...new Set([...indexedSlugs, ...fsPosts.map((post) => post.slug)]),
+  ];
+
+  if (allSlugs.length === 0) {
+    return [];
   }
+
+  const posts = await Promise.all(allSlugs.map((slug) => getBlogPost(slug)));
+
+  return posts
+    .filter((post): post is BlogPost => post !== null)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+export async function getBlogPost(slug: string): Promise<BlogPost | null> {
+  const post = await readJson<BlogPost | null>(STORAGE_KEYS.blogPost(slug), {
+    filePath: blogFilePath(slug),
+    fallback: null,
+  });
+
+  return post;
 }
 
 export async function saveBlogPost(post: BlogPost): Promise<void> {
-  await mkdir(BLOG_DIR, { recursive: true });
-  await writeFile(blogFilePath(post.slug), JSON.stringify(post, null, 2), "utf8");
+  await writeJson(STORAGE_KEYS.blogPost(post.slug), post, {
+    filePath: blogFilePath(post.slug),
+  });
+
+  if (isKvStorageEnabled()) {
+    const slugs = await getBlogIndex();
+    if (!slugs.includes(post.slug)) {
+      await setBlogIndex([post.slug, ...slugs]);
+    }
+  }
 }
 
 export async function deleteBlogPost(slug: string): Promise<boolean> {
   try {
+    if (isKvStorageEnabled()) {
+      await deleteJson(STORAGE_KEYS.blogPost(slug));
+      const slugs = await getBlogIndex();
+      await setBlogIndex(slugs.filter((entry) => entry !== slug));
+    }
+
+    const { unlink } = await import("fs/promises");
     await unlink(blogFilePath(slug));
     return true;
   } catch {
-    return false;
+    return isKvStorageEnabled();
   }
 }
 

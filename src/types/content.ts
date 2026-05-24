@@ -29,6 +29,7 @@ export type FaviconSettings = {
   fileName: string;
   contentType: string;
   updatedAt: string | null;
+  dataBase64?: string | null;
 };
 
 export type AiSettings = {

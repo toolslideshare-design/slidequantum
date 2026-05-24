@@ -4,10 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 import type { BlogPost } from "@/types/content";
+import { submitAdminJsonRequest } from "@/lib/admin-client";
 import { AdminCard } from "@/components/admin/admin-card";
 import { AdminField, adminInputClassName } from "@/components/admin/admin-field";
+import {
+  AdminMessage,
+  getAdminMessageVariant,
+} from "@/components/admin/admin-message";
 import { Button } from "@/components/ui/button";
-
 type BlogFormProps = {
   initialPost?: BlogPost;
   mode: "create" | "edit";
@@ -25,7 +29,8 @@ export function BlogForm({ initialPost, mode }: BlogFormProps) {
     }
   );
   const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [isStorageError, setIsStorageError] = useState(false);  const [saving, setSaving] = useState(false);
 
   const input = adminInputClassName();
   const textarea = `${input} min-h-40 resize-y`;
@@ -41,17 +46,19 @@ export function BlogForm({ initialPost, mode }: BlogFormProps) {
 
     const method = mode === "create" ? "POST" : "PUT";
 
-    const response = await fetch(url, {
+    const result = await submitAdminJsonRequest<BlogPost>({
+      url,
       method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(post),
+      body: post,
+      fallbackError: "Failed to save blog post.",
     });
 
     setSaving(false);
 
-    if (!response.ok) {
-      const data = (await response.json()) as { error?: string };
-      setMessage(data.error ?? "Failed to save blog post.");
+    if (!result.ok) {
+      setIsError(true);
+      setIsStorageError(result.isStorageError);
+      setMessage(result.error);
       return;
     }
 
@@ -59,7 +66,6 @@ export function BlogForm({ initialPost, mode }: BlogFormProps) {
     router.push("/admin/blog");
     router.refresh();
   }
-
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -74,12 +80,10 @@ export function BlogForm({ initialPost, mode }: BlogFormProps) {
         </Button>
       </div>
 
-      {message && (
-        <p className="rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-200">
-          {message}
-        </p>
-      )}
-
+      <AdminMessage
+        message={message}
+        variant={getAdminMessageVariant({ isError, isStorageError })}
+      />
       <AdminCard title="Post Details">
         <div className="grid gap-4">
           <AdminField label="Title">

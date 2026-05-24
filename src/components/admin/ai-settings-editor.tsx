@@ -2,8 +2,13 @@
 
 import { Eye, EyeOff, KeyRound, Save, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import { submitAdminJsonRequest } from "@/lib/admin-client";
 import { AdminCard } from "@/components/admin/admin-card";
 import { AdminField, adminInputClassName } from "@/components/admin/admin-field";
+import {
+  AdminMessage,
+  getAdminMessageVariant,
+} from "@/components/admin/admin-message";
 import { Button } from "@/components/ui/button";
 
 type AiSettingsResponse = {
@@ -18,6 +23,8 @@ export function AiSettingsEditor() {
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [isStorageError, setIsStorageError] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/ai-settings")
@@ -29,25 +36,35 @@ export function AiSettingsEditor() {
     setSaving(true);
     setMessage("");
 
-    const response = await fetch("/api/admin/ai-settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ geminiApiKey }),
-    });
-    const data = (await response.json()) as {
+    const result = await submitAdminJsonRequest<{
       settings?: AiSettingsResponse;
-      error?: string;
-    };
+    }>({
+      url: "/api/admin/ai-settings",
+      method: "PUT",
+      body: { geminiApiKey },
+      fallbackError: "Failed to save AI settings.",
+    });
 
     setSaving(false);
 
-    if (!response.ok || !data.settings) {
-      setMessage(data.error ?? "Failed to save AI settings.");
+    if (!result.ok) {
+      setIsError(true);
+      setIsStorageError(result.isStorageError);
+      setMessage(result.error);
       return;
     }
 
-    setSettings(data.settings);
+    if (!result.data.settings) {
+      setIsError(true);
+      setIsStorageError(false);
+      setMessage("Failed to save AI settings.");
+      return;
+    }
+
+    setSettings(result.data.settings);
     setGeminiApiKey("");
+    setIsError(false);
+    setIsStorageError(false);
     setMessage("AI settings saved successfully.");
   }
 
@@ -76,11 +93,10 @@ export function AiSettingsEditor() {
         </Button>
       </div>
 
-      {message && (
-        <p className="rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-200">
-          {message}
-        </p>
-      )}
+      <AdminMessage
+        message={message}
+        variant={getAdminMessageVariant({ isError, isStorageError })}
+      />
 
       <AdminCard
         title="Gemini API Key"

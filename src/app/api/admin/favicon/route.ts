@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import { requireAdminApi } from "@/lib/admin-api";
+import { requireAdminApi, adminSaveErrorResponse } from "@/lib/admin-api";
 import {
   getFaviconContentType,
   getFaviconSettings,
   saveFaviconSettings,
 } from "@/lib/data/favicon";
+import { canUseFilesystemWrites } from "@/lib/storage/json-store";
 
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 const supportedExtensions = ["ico", "png", "svg"];
@@ -50,21 +51,26 @@ export async function POST(request: Request) {
     }
 
     const fileName = `favicon.${extension}`;
-    const filePath = path.join(PUBLIC_DIR, fileName);
     const bytes = Buffer.from(await file.arrayBuffer());
+    const useRemoteStorage = !canUseFilesystemWrites();
+    const dataBase64 = useRemoteStorage ? bytes.toString("base64") : null;
 
-    await mkdir(PUBLIC_DIR, { recursive: true });
-    await writeFile(filePath, bytes);
+    if (!useRemoteStorage) {
+      const filePath = path.join(PUBLIC_DIR, fileName);
+      await mkdir(PUBLIC_DIR, { recursive: true });
+      await writeFile(filePath, bytes);
+    }
 
-    const settings = await saveFaviconSettings({ fileName, contentType });
+    const settings = await saveFaviconSettings({
+      fileName,
+      contentType,
+      dataBase64,
+    });
 
     revalidatePath("/", "layout");
 
     return NextResponse.json({ success: true, settings });
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to upload favicon." },
-      { status: 400 }
-    );
+  } catch (error) {
+    return adminSaveErrorResponse(error, "Failed to upload favicon.");
   }
 }

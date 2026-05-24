@@ -1,9 +1,10 @@
 import "server-only";
 
 import { randomBytes, scryptSync, createHmac, timingSafeEqual } from "crypto";
-import { mkdir, readFile, writeFile } from "fs/promises";
 import { cookies } from "next/headers";
 import type { PublicUser, StoredUser } from "@/types/content";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 import { USERS_FILE } from "@/lib/data/paths";
 import { USER_COOKIE } from "@/lib/user-auth-constants";
 
@@ -26,17 +27,16 @@ function toPublicUser(user: StoredUser): PublicUser {
 }
 
 async function readUsers(): Promise<StoredUser[]> {
-  try {
-    const raw = await readFile(USERS_FILE, "utf8");
-    return JSON.parse(raw) as StoredUser[];
-  } catch {
-    return [];
-  }
+  return readJson(STORAGE_KEYS.users, {
+    filePath: USERS_FILE,
+    fallback: [],
+  });
 }
 
 async function writeUsers(users: StoredUser[]): Promise<void> {
-  await mkdir(USERS_FILE.replace(/[/\\][^/\\]+$/, ""), { recursive: true });
-  await writeFile(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+  await writeJson(STORAGE_KEYS.users, users, {
+    filePath: USERS_FILE,
+  });
 }
 
 export async function createUser({

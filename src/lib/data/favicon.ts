@@ -1,15 +1,19 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
 import type { FaviconSettings } from "@/types/content";
 import { FAVICON_SETTINGS_FILE } from "@/lib/data/paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import {
+  readJson,
+  writeJson,
+} from "@/lib/storage/json-store";
 
 const defaultFaviconSettings: FaviconSettings = {
   href: "/favicon.svg",
   fileName: "favicon.svg",
   contentType: "image/svg+xml",
   updatedAt: null,
+  dataBase64: null,
 };
 
 const extensionToContentType: Record<string, string> = {
@@ -23,34 +27,32 @@ export function getFaviconContentType(extension: string): string | null {
 }
 
 export async function getFaviconSettings(): Promise<FaviconSettings> {
-  try {
-    const raw = await readFile(FAVICON_SETTINGS_FILE, "utf8");
-    return JSON.parse(raw) as FaviconSettings;
-  } catch {
-    return defaultFaviconSettings;
-  }
+  return readJson(STORAGE_KEYS.favicon, {
+    filePath: FAVICON_SETTINGS_FILE,
+    fallback: defaultFaviconSettings,
+  });
 }
 
 export async function saveFaviconSettings({
   fileName,
   contentType,
+  dataBase64 = null,
 }: {
   fileName: string;
   contentType: string;
+  dataBase64?: string | null;
 }): Promise<FaviconSettings> {
   const settings: FaviconSettings = {
-    href: `/${fileName}`,
+    href: dataBase64 ? "/api/favicon" : `/${fileName}`,
     fileName,
     contentType,
     updatedAt: new Date().toISOString(),
+    dataBase64,
   };
 
-  await mkdir(path.dirname(FAVICON_SETTINGS_FILE), { recursive: true });
-  await writeFile(
-    FAVICON_SETTINGS_FILE,
-    JSON.stringify(settings, null, 2),
-    "utf8"
-  );
+  await writeJson(STORAGE_KEYS.favicon, settings, {
+    filePath: FAVICON_SETTINGS_FILE,
+  });
 
   return settings;
 }

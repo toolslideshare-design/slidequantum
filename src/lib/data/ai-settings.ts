@@ -1,8 +1,9 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "fs/promises";
 import type { AiSettings } from "@/types/content";
 import { AI_SETTINGS_FILE } from "@/lib/data/paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 
 const defaultAiSettings: AiSettings = {
   geminiApiKey: "",
@@ -10,12 +11,10 @@ const defaultAiSettings: AiSettings = {
 };
 
 export async function getAiSettings(): Promise<AiSettings> {
-  try {
-    const raw = await readFile(AI_SETTINGS_FILE, "utf8");
-    return JSON.parse(raw) as AiSettings;
-  } catch {
-    return defaultAiSettings;
-  }
+  return readJson(STORAGE_KEYS.aiSettings, {
+    filePath: AI_SETTINGS_FILE,
+    fallback: defaultAiSettings,
+  });
 }
 
 export async function saveAiSettings(geminiApiKey: string): Promise<AiSettings> {
@@ -24,10 +23,9 @@ export async function saveAiSettings(geminiApiKey: string): Promise<AiSettings> 
     updatedAt: new Date().toISOString(),
   };
 
-  await mkdir(AI_SETTINGS_FILE.replace(/[/\\][^/\\]+$/, ""), {
-    recursive: true,
+  await writeJson(STORAGE_KEYS.aiSettings, settings, {
+    filePath: AI_SETTINGS_FILE,
   });
-  await writeFile(AI_SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf8");
 
   return settings;
 }

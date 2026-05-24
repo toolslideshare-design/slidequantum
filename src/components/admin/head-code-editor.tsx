@@ -3,13 +3,20 @@
 import { useEffect, useState } from "react";
 import { Code2, Save } from "lucide-react";
 import type { HeadCodeSettings } from "@/types/content";
+import { submitAdminJsonRequest } from "@/lib/admin-client";
 import { AdminCard } from "@/components/admin/admin-card";
 import { adminInputClassName } from "@/components/admin/admin-field";
+import {
+  AdminMessage,
+  getAdminMessageVariant,
+} from "@/components/admin/admin-message";
 import { Button } from "@/components/ui/button";
 
 export function HeadCodeEditor() {
   const [settings, setSettings] = useState<HeadCodeSettings | null>(null);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [isStorageError, setIsStorageError] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -24,24 +31,35 @@ export function HeadCodeEditor() {
     setSaving(true);
     setMessage("");
 
-    const response = await fetch("/api/admin/head-code", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: settings.code }),
-    });
-    const data = (await response.json()) as {
+    const result = await submitAdminJsonRequest<{
+      success?: boolean;
       settings?: HeadCodeSettings;
-      error?: string;
-    };
+    }>({
+      url: "/api/admin/head-code",
+      method: "PUT",
+      body: { code: settings.code },
+      fallbackError: "Failed to save head code.",
+    });
 
     setSaving(false);
 
-    if (!response.ok || !data.settings) {
-      setMessage(data.error ?? "Failed to save head code.");
+    if (!result.ok) {
+      setIsError(true);
+      setIsStorageError(result.isStorageError);
+      setMessage(result.error);
       return;
     }
 
-    setSettings(data.settings);
+    if (!result.data.settings) {
+      setIsError(true);
+      setIsStorageError(false);
+      setMessage("Failed to save head code.");
+      return;
+    }
+
+    setSettings(result.data.settings);
+    setIsError(false);
+    setIsStorageError(false);
     setMessage("Head code saved successfully.");
   }
 
@@ -71,11 +89,10 @@ export function HeadCodeEditor() {
         </Button>
       </div>
 
-      {message && (
-        <p className="rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-200">
-          {message}
-        </p>
-      )}
+      <AdminMessage
+        message={message}
+        variant={getAdminMessageVariant({ isError, isStorageError })}
+      />
 
       <AdminCard
         title="Website Head Injection"

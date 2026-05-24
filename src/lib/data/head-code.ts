@@ -1,8 +1,9 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "fs/promises";
 import type { HeadCodeSettings } from "@/types/content";
 import { HEAD_CODE_FILE } from "@/lib/data/paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 
 const defaultHeadCode: HeadCodeSettings = {
   code: "",
@@ -10,12 +11,10 @@ const defaultHeadCode: HeadCodeSettings = {
 };
 
 export async function getHeadCode(): Promise<HeadCodeSettings> {
-  try {
-    const raw = await readFile(HEAD_CODE_FILE, "utf8");
-    return JSON.parse(raw) as HeadCodeSettings;
-  } catch {
-    return defaultHeadCode;
-  }
+  return readJson(STORAGE_KEYS.headCode, {
+    filePath: HEAD_CODE_FILE,
+    fallback: defaultHeadCode,
+  });
 }
 
 export async function saveHeadCode(code: string): Promise<HeadCodeSettings> {
@@ -24,10 +23,9 @@ export async function saveHeadCode(code: string): Promise<HeadCodeSettings> {
     updatedAt: new Date().toISOString(),
   };
 
-  await mkdir(HEAD_CODE_FILE.replace(/[/\\][^/\\]+$/, ""), {
-    recursive: true,
+  await writeJson(STORAGE_KEYS.headCode, settings, {
+    filePath: HEAD_CODE_FILE,
   });
-  await writeFile(HEAD_CODE_FILE, JSON.stringify(settings, null, 2), "utf8");
 
   return settings;
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/admin-api";
+import { requireAdminApi, adminSaveErrorResponse } from "@/lib/admin-api";
 import {
   getAiSettings,
   maskGeminiKey,
@@ -26,10 +26,7 @@ export async function PUT(request: Request) {
       success: true,
       settings: maskGeminiKey(settings),
     });
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to save AI settings." },
-      { status: 400 }
-    );
+  } catch (error) {
+    return adminSaveErrorResponse(error, "Failed to save AI settings.");
   }
 }

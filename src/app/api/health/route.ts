@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
+import { getStorageStatus } from "@/lib/storage/json-store";
 
-/**
- * Health check endpoint — useful when you add a real backend later.
- */
 export async function GET() {
+  const storage = await getStorageStatus();
+
   return NextResponse.json({
-    status: "ok",
-    service: "slideshare-downloader",
+    status: storage.writable ? "ok" : "degraded",
+    service: "slidequantum",
+    storage,
     timestamp: new Date().toISOString(),
   });
 }

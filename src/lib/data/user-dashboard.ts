@@ -1,12 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { mkdir, readFile, writeFile } from "fs/promises";
 import type { DownloadHistoryItem, SavedPresentation } from "@/types/content";
 import {
   DOWNLOAD_HISTORY_FILE,
   SAVED_PRESENTATIONS_FILE,
 } from "@/lib/data/paths";
+import { STORAGE_KEYS } from "@/lib/storage/keys";
+import { readJson, writeJson } from "@/lib/storage/json-store";
 
 type NewDownloadHistoryItem = {
   title: string;
@@ -21,34 +22,30 @@ type NewSavedPresentation = {
   thumbnailUrl: string;
 };
 
-async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
-  try {
-    const raw = await readFile(filePath, "utf8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-async function writeJsonFile<T>(filePath: string, data: T): Promise<void> {
-  await mkdir(filePath.replace(/[/\\][^/\\]+$/, ""), { recursive: true });
-  await writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
-}
-
 async function readDownloadHistory(): Promise<DownloadHistoryItem[]> {
-  return readJsonFile<DownloadHistoryItem[]>(DOWNLOAD_HISTORY_FILE, []);
+  return readJson(STORAGE_KEYS.downloadHistory, {
+    filePath: DOWNLOAD_HISTORY_FILE,
+    fallback: [],
+  });
 }
 
 async function writeDownloadHistory(items: DownloadHistoryItem[]): Promise<void> {
-  await writeJsonFile(DOWNLOAD_HISTORY_FILE, items);
+  await writeJson(STORAGE_KEYS.downloadHistory, items, {
+    filePath: DOWNLOAD_HISTORY_FILE,
+  });
 }
 
 async function readSavedPresentations(): Promise<SavedPresentation[]> {
-  return readJsonFile<SavedPresentation[]>(SAVED_PRESENTATIONS_FILE, []);
+  return readJson(STORAGE_KEYS.savedPresentations, {
+    filePath: SAVED_PRESENTATIONS_FILE,
+    fallback: [],
+  });
 }
 
 async function writeSavedPresentations(items: SavedPresentation[]): Promise<void> {
-  await writeJsonFile(SAVED_PRESENTATIONS_FILE, items);
+  await writeJson(STORAGE_KEYS.savedPresentations, items, {
+    filePath: SAVED_PRESENTATIONS_FILE,
+  });
 }
 
 export async function getUserDownloadHistory(
